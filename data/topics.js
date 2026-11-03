@@ -538,7 +538,7 @@ function addExercises(topic, items) {
     } else if (it[0] === "rw") {
       ex = { id, topic, type: "rw", source: it[1], start: it[2], answers: it[3], explanation: it[4], concept: it[5] };
     } else {
-      ex = { id, topic, type: "err", parts: it[1], answers: [it[2]], correction: it[3], explanation: it[4], concept: it[5] };
+      ex = { id, topic, type: "err", parts: it[1], answers: [it[2]], correction: it[3], explanation: it[4], concept: it[5], fixed: it[6] };
     }
     EXERCISES.push(ex);
     EXERCISE_BY_ID[id] = ex;

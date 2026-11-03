@@ -140,25 +140,95 @@ function setNav(name) {
 }
 
 function renderRule(t) {
-  const concepts = Object.values(t.concepts || {});
   return `
     <p class="rule-intro">${t.intro}</p>
     <h4>Estructura</h4>
     <div class="table-wrap"><table class="rule-table">${t.structure.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table></div>
     <h4>Cuándo se usa</h4>
-    ${concepts.map((c) => conceptBlock(c)).join("")}
+    ${Object.entries(t.concepts || {}).map(([k, c]) => conceptBlock(t.id, k, c)).join("")}
     <h4>Palabras señal</h4>
     <p>${t.signals}</p>
     <h4>Errores típicos</h4>
     <ul class="typical">${t.mistakes.map(([bad, good, why]) => `<li><span class="bad">✗ ${esc(bad)}</span> → <span class="good">✓ ${esc(good)}</span> <span class="muted small">${esc(why)}</span></li>`).join("")}</ul>`;
 }
 
-const conceptBlock = (c) => `
+const conceptBlock = (topicId, key, c) => `
   <div class="concept-block">
     <strong>${c.title}</strong>
     <p>${c.text}</p>
-    <ul>${c.examples.map((e) => `<li>${e}</li>`).join("")}</ul>
+    ${exampleList(topicId, key, c.examples)}
   </div>`;
+
+// ---------- Traducción y audio ----------
+
+const stripTags = (html) => html.replace(/<[^>]+>/g, "");
+// Lo que lee la voz: sin etiquetas ni aclaraciones entre paréntesis.
+const sayable = (html) => stripTags(html).replace(/\s*\([^)]*\)/g, "").replace(/[«»"]/g, "").trim();
+const sayBtn = (text) => (canSpeak ? `<button class="say" data-say="${esc(sayable(text))}" title="Escuchar" aria-label="Escuchar">🔊</button>` : "");
+
+// Ejemplos en inglés con su traducción debajo.
+function exampleList(topicId, key, examples) {
+  const es = ES[topicId]?.c[key] || [];
+  return `<ul class="examples">${examples.map((e, i) => `<li>${e} ${sayBtn(e)}${es[i] ? `<span class="es">${esc(es[i])}</span>` : ""}</li>`).join("")}</ul>`;
+}
+
+// La oración completa y correcta de un ejercicio.
+function fullSentence(ex) {
+  if (ex.type === "err") return ex.fixed || ex.parts.map((p, i) => (i === ex.answers[0] ? ex.correction : p)).join(" ");
+  if (ex.type === "rw") return `${ex.start} ${ex.answers[0]}`;
+  return ex.prompt.replace(/ \([^)]*\)/, "").replace("___", ex.answers[0]);
+}
+
+// Lo que lee la voz antes de responder: la oración con una pausa en el espacio, sin la pista entre paréntesis.
+// En "encontrar el error" no se lee, para no escuchar la oración mal dicha.
+function promptSpeech(ex) {
+  if (ex.type === "err") return "";
+  if (ex.type === "rw") return ex.source;
+  return ex.prompt.replace(/ \([^)]*\)/g, "").replace("___", "...");
+}
+
+// Pronunciación escrita de una opción, solo si se conocen todas sus palabras.
+let pronCache = null;
+function pronMap() {
+  if (pronCache) return pronCache;
+  const m = {};
+  const add = (w, p) => { if (w && p && !(w in m)) m[w] = p; };
+  const pair = (forms, pr) => { const q = (pr || "").split(" / "); forms.split(" / ").forEach((f, i) => add(f, q[i] || q[0])); };
+  for (const [base, s, ing, past, pp] of [...IRREGULAR_VERBS, ...REGULAR_VERBS]) {
+    const p = (VERB_PRON[base] || "").split(" · ");
+    if (!p[0]) continue;
+    add(base, p[0]);
+    pair(past, p[1]);
+    pair(pp, p[2] || p[1]);
+    add(ing, p[0] + "ing");
+    const sibilant = /(ch|sh|x|ss|z)es$/.test(s) || (base.endsWith("e") && /[cgsz]es$/.test(s));
+    add(s, p[0] + (sibilant ? "is" : "s"));
+  }
+  pronCache = { ...m, ...WORD_PRON };
+  return pronCache;
+}
+function pronOf(text) {
+  const m = pronMap();
+  const words = text.toLowerCase().replace(/[’]/g, "'").replace(/[.,!?;:]/g, "").split(/\s+/).filter(Boolean);
+  const out = words.map((w) => m[w]);
+  return out.length && out.every(Boolean) ? out.join(" ") : null;
+}
+
+// Significado y pronunciación de los verbos que aparecen entre paréntesis en la consigna.
+function glossary(ex) {
+  const hint = (ex.prompt || "").match(/\(([^)]*)\)/);
+  if (!hint) return "";
+  const verbs = [...IRREGULAR_VERBS, ...REGULAR_VERBS];
+  const found = hint[1].toLowerCase().split(/[\s/]+/).map((w) => verbs.find((v) => v[0] === w)).filter(Boolean);
+  return found.length ? `<p class="gloss">${found.map((v) => `<b>${v[0]}</b> <i class="muted">${esc(pronOf(v[0]) || "")}</i> = ${esc(v[5])} ${sayBtn(v[0])}`).join(" · ")}</p>` : "";
+}
+
+// Solo los ejercicios escritos a mano tienen traducción (los generados se arman al azar).
+function translationOf(ex) {
+  if (!EXERCISE_BY_ID[ex.id]) return null;
+  const [topic, i] = ex.id.split(":");
+  return ES[topic]?.ex[+i] || null;
+}
 
 const conceptOf = (ex) => TOPIC_BY_ID[ex.topic].concepts?.[ex.concept];
 const blank = (html) => html.replace("___", `<span class="blank">&nbsp;</span>`);
@@ -245,10 +315,37 @@ function topicCard(t) {
       <p class="muted small">${s.total ? `Dominio ${s.mastery}% · ${Math.round(s.acc * 100)}% en los últimos ${s.recentN}` : "Sin practicar todavía"}</p>
       <div class="topic-actions">
         <button class="btn primary small" data-start="topic" data-topic="${t.id}">Practicar</button>
-        <button class="btn ghost small" data-rule="${t.id}">Ver regla</button>
+        <button class="btn ghost small" data-read="${t.id}">Ver regla</button>
       </div>
-      <div class="rule" id="rule-${t.id}" hidden>${renderRule(t)}</div>
     </article>`;
+}
+
+// ---------- Regla (pantalla de lectura) ----------
+
+function renderRulePage(topicId) {
+  const t = TOPIC_BY_ID[topicId];
+  if (!t) { location.replace("#inicio"); return; }
+  setNav("");
+  session = null;
+  const i = TOPICS.indexOf(t), prev = TOPICS[i - 1], nxt = TOPICS[i + 1];
+  const s = topicStats(t.id);
+  const level = LEVELS.find((l) => l.id === t.level);
+  view.innerHTML = `
+    <article class="card rule-page">
+      <button class="btn ghost small back" data-nav="home">← Temas</button>
+      <p class="muted small">${esc(level.name)} · ${s.total ? `Dominio ${s.mastery}%` : "Sin practicar todavía"}</p>
+      <h1>${esc(t.name)}</h1>
+      <div class="rule-body">${renderRule(t)}</div>
+      <div class="hero-actions">
+        <button class="btn primary" data-start="topic" data-topic="${t.id}">Practicar este tema</button>
+        ${VERB_TOPICS.includes(t.id) ? `<button class="btn" data-nav="verbs">Ver lista de verbos</button>` : ""}
+      </div>
+    </article>
+    <div class="rule-pager">
+      ${prev ? `<button class="btn" data-read="${prev.id}">← ${esc(prev.name)}</button>` : "<span></span>"}
+      ${nxt ? `<button class="btn" data-read="${nxt.id}">${esc(nxt.name)} →</button>` : ""}
+    </div>`;
+  window.scrollTo(0, 0);
 }
 
 // ---------- Sesión ----------
@@ -266,20 +363,23 @@ function renderQuestion() {
   const ex = session.items[session.i];
   const topic = TOPIC_BY_ID[ex.topic];
   const test = session.mode === "placement";
-  Object.assign(session, { answered: false, hinted: false, retried: false });
+  Object.assign(session, { answered: false, hinted: false, hintShown: false, retried: false });
   let body = "";
   if (ex.type === "mc") {
     session.shuffled = shuffle(ex.options);
-    body = `<p class="prompt">${blank(esc(ex.prompt))}</p>
-      <div class="options">${session.shuffled.map((o, i) => `<button class="option" data-opt="${i}"><kbd>${i + 1}</kbd>${esc(o)}</button>`).join("")}</div>`;
+    // Solo si se conocen todas: una opción sin pronunciación delataría una forma inventada (goed, leaved).
+    const prons = session.shuffled.map(pronOf);
+    body = `<p class="prompt">${blank(esc(ex.prompt))} ${sayBtn(promptSpeech(ex))}</p>${glossary(ex)}
+      <div class="options">${session.shuffled.map((o, i) => { const pr = prons.every(Boolean) && prons[i]; return `<div class="option-row">
+        <button class="option" data-opt="${i}"><kbd>${i + 1}</kbd><span>${esc(o)}${pr ? `<span class="sound">${esc(pr)}</span>` : ""}</span></button>${sayBtn(o)}</div>`; }).join("")}</div>`;
   } else if (ex.type === "gap") {
     const hint = ex.options ? `<p class="muted small">Opciones: ${ex.options.map(esc).join(" / ")}</p>` : "";
     const parts = esc(ex.prompt).split("___");
-    body = `<p class="prompt">${parts[0]}<input id="gap" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta">${parts.slice(1).join("___")}</p>
-      ${hint}<button class="btn primary" id="check">Comprobar</button>`;
+    body = `<p class="prompt">${parts[0]}<input id="gap" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta">${parts.slice(1).join("___")} ${sayBtn(promptSpeech(ex))}</p>
+      ${glossary(ex)}${hint}<button class="btn primary" id="check">Comprobar</button>`;
   } else if (ex.type === "rw") {
     body = `<p class="muted">Reescribí la oración empezando como se indica, sin cambiar el significado.</p>
-      <p class="source">${esc(ex.source)}</p>
+      <p class="source">${esc(ex.source)} ${sayBtn(ex.source)}</p>
       <p class="prompt rw-line"><span class="rw-start">${esc(ex.start)}</span><input id="gap" class="wide" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Continuación"></p>
       <button class="btn primary" id="check">Comprobar</button>`;
   } else {
@@ -292,6 +392,7 @@ function renderQuestion() {
         <span class="muted small">${session.i + 1} / ${session.items.length} · ${test ? "Test de nivel · " : ""}${esc(topic.name)}</span>
         <span>
           ${test ? `<button class="btn ghost small" id="skip">No sé</button>` : `
+          ${translationOf(ex) ? `<button class="btn ghost small" id="es-btn" title="Muestra la oración en español. Cuenta como pista.">🇪🇸 Traducción</button>` : ""}
           <button class="btn ghost small" id="hint-btn">💡 Pista</button>
           <button class="btn ghost small" id="show-rule">Regla</button>`}
         </span>
@@ -299,6 +400,7 @@ function renderQuestion() {
       <div class="progress-bar"><div style="width:${(session.i / session.items.length) * 100}%"></div></div>
       <div class="rule" id="q-rule" hidden>${renderRule(topic)}</div>
       ${body}
+      <div id="es-line"></div>
       <div id="hint"></div>
       <div id="feedback"></div>
     </section>`;
@@ -308,8 +410,8 @@ function renderQuestion() {
 
 function showHint() {
   const ex = session.items[session.i];
-  if (session.answered || session.hinted) return;
-  session.hinted = true;
+  if (session.answered || session.hintShown) return;
+  session.hintShown = session.hinted = true;
   $("#hint-btn").disabled = true;
   const c = conceptOf(ex);
   let specific = "";
@@ -329,6 +431,14 @@ function showHint() {
     specific = "Abrimos la regla del tema.";
   }
   $("#hint").innerHTML = `<div class="hint">💡 ${c ? `Fijate en: <b>${c.title}</b>. ` : ""}${specific}</div>`;
+}
+
+// La traducción da el tiempo verbal, así que cuenta como pista.
+function showTranslation() {
+  if (session.answered) return;
+  session.hinted = true;
+  $("#es-btn").disabled = true;
+  $("#es-line").innerHTML = `<p class="es-reveal">🇪🇸 ${esc(translationOf(session.items[session.i]))} <span class="muted small">(cuenta como pista)</span></p>`;
 }
 
 function answer(given) {
@@ -389,19 +499,22 @@ function answer(given) {
     }
   }
   const c = conceptOf(ex);
+  const es = translationOf(ex), listen = sayBtn(fullSentence(ex));
   const last = session.i === session.items.length - 1;
   $("#hint").innerHTML = "";
+  $("#es-line").innerHTML = "";
   $("#feedback").innerHTML = `
     <div class="feedback ${ok ? "ok" : "ko"}">
       <strong>${ok ? `✓ ¡Correcto!${session.hinted ? " <span class='muted small'>(con pista: va a volver mañana)</span>" : ""}` : "✗ Incorrecto"}</strong>
       ${ok && ex.type === "mc" ? "" : `<p>Respuesta${ex.answers.length > 1 && ex.type === "gap" ? "s aceptadas" : ""}: <b>${esc(right)}</b></p>`}
       <p class="why"><span class="label">Por qué</span>${ex.explanation}</p>
       ${whyWrong ? `<p class="why"><span class="label">Tu respuesta</span>${whyWrong}</p>` : ""}
+      ${es || listen ? `<p class="why"><span class="label">${es ? "En español" : "Escuchar"}</span>${es ? esc(es) + " " : ""}${listen}</p>` : ""}
     </div>
     ${c ? `<details class="concept" ${ok ? "" : "open"}>
       <summary>Más ejemplos: ${c.title}</summary>
       <p>${c.text}</p>
-      <ul>${c.examples.map((e) => `<li>${e}</li>`).join("")}</ul>
+      ${exampleList(ex.topic, ex.concept, c.examples)}
     </details>` : ""}
     <button class="btn primary" id="next">${last ? "Ver resultado" : "Siguiente"} <kbd>Enter</kbd></button>`;
   $("#next").focus();
@@ -459,9 +572,108 @@ function renderPlacementResult() {
 }
 
 function mistakeLine(ex) {
-  if (ex.type === "err") return ex.parts.map((p, i) => (i === ex.answers[0] ? `<b>${esc(ex.correction)}</b>` : esc(p))).join(" ");
+  if (ex.type === "err") return ex.fixed || ex.parts.map((p, i) => (i === ex.answers[0] ? `<b>${esc(ex.correction)}</b>` : esc(p))).join(" ");
   if (ex.type === "rw") return `${esc(ex.source)} → ${esc(ex.start)} <b>${esc(ex.answers[0])}</b>`;
   return esc(ex.prompt).replace(/ \([^)]*\)/, "").replace("___", `<b>${esc(ex.answers[0])}</b>`);
+}
+
+// ---------- Verbos ----------
+
+const VERB_TOPICS = ["past-simple", "past-cont", "present-perfect", "pp-vs-past", "passive"];
+let verbsFilter = { q: "", kind: "all", open: null };
+
+// Un verbo en los tiempos que se practican, con la 1.ª y la 3.ª persona (la que cambia).
+function conjugation(v) {
+  const [base, s, ing] = v;
+  const [past, pp] = [v[3], v[4]].map((f) => f.split(" / ")[0]);
+  if (base === "be") return [
+    ["Present simple", "I <b>am</b> · she <b>is</b> · they <b>are</b>", "I'm <b>not</b> · she <b>isn't</b>", "<b>Are</b> you…? · <b>Is</b> she…?"],
+    ["Past simple", "I <b>was</b> · they <b>were</b>", "I <b>wasn't</b> · they <b>weren't</b>", "<b>Was</b> she…? · <b>Were</b> you…?"],
+    ["Present perfect", "I've <b>been</b> · she's <b>been</b>", "I <b>haven't been</b> · she <b>hasn't been</b>", "<b>Have</b> you <b>been</b>…?"],
+    ["Future (will)", "I'll <b>be</b>", "I <b>won't be</b>", "<b>Will</b> you <b>be</b>…?"],
+    ["Going to", "I'm <b>going to be</b>", "I'm <b>not going to be</b>", "<b>Are</b> you <b>going to be</b>…?"],
+  ];
+  return [
+    ["Present simple", `I <b>${base}</b> · she <b>${s}</b>`, `I <b>don't ${base}</b> · she <b>doesn't ${base}</b>`, `<b>Do</b> you <b>${base}</b>? · <b>Does</b> she <b>${base}</b>?`],
+    ["Present continuous", `I'm <b>${ing}</b> · she's <b>${ing}</b>`, `I'm <b>not ${ing}</b> · she <b>isn't ${ing}</b>`, `<b>Are</b> you <b>${ing}</b>?`],
+    ["Past simple", `I <b>${past}</b> · she <b>${past}</b>`, `I <b>didn't ${base}</b>`, `<b>Did</b> you <b>${base}</b>?`],
+    ["Past continuous", `I <b>was ${ing}</b> · they <b>were ${ing}</b>`, `I <b>wasn't ${ing}</b>`, `<b>Were</b> you <b>${ing}</b>?`],
+    ["Present perfect", `I've <b>${pp}</b> · she's <b>${pp}</b>`, `I <b>haven't ${pp}</b> · she <b>hasn't ${pp}</b>`, `<b>Have</b> you <b>${pp}</b>? · <b>Has</b> she <b>${pp}</b>?`],
+    ["Future (will)", `I'll <b>${base}</b>`, `I <b>won't ${base}</b>`, `<b>Will</b> you <b>${base}</b>?`],
+    ["Going to", `I'm <b>going to ${base}</b>`, `I'm <b>not going to ${base}</b>`, `<b>Are</b> you <b>going to ${base}</b>?`],
+  ];
+}
+
+// Pronunciación escrita de la forma i (0 base, 1 pasado, 2 participio). En los regulares, el participio suena como el pasado.
+function sounds(v, i) {
+  const p = (VERB_PRON[v[0]] || "").split(" · ");
+  const s = p[Math.min(i, p.length - 1)];
+  return s ? `<span class="sound">${esc(s)}</span>` : "";
+}
+
+const canSpeak = "speechSynthesis" in window;
+function speak(text) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US";
+  u.rate = 0.85;
+  speechSynthesis.speak(u);
+}
+
+function renderVerbs() {
+  setNav("verbs");
+  session = null;
+  const kinds = [["all", "Todos"], ["irregular", "Irregulares"], ["regular", "Regulares"]];
+  view.innerHTML = `
+    <section class="card">
+      <h2>Verbos</h2>
+      <p class="muted small">Base, pasado y participio de ${IRREGULAR_VERBS.length} verbos irregulares y ${REGULAR_VERBS.length} regulares frecuentes. Tocá un verbo para ver cómo se conjuga${canSpeak ? " y escucharlo" : ""}.</p>
+      <p class="muted small">Debajo de cada forma está cómo suena, escrito a la española. Es aproximado: la tilde marca la sílaba fuerte, <b>z</b> es con la lengua entre los dientes (<i>think</i>), <b>sh</b> como en «shampoo» y <b>j</b> es una h suave, como un suspiro (<i>have</i>).</p>
+      <div class="filters">
+        <input type="search" id="verbs-q" placeholder="Buscar en inglés o español" value="${esc(verbsFilter.q)}" autocomplete="off" aria-label="Buscar verbo">
+        <div class="seg">${kinds.map(([k, l]) => `<button class="btn small ${verbsFilter.kind === k ? "primary" : ""}" data-verbs-kind="${k}">${l}</button>`).join("")}</div>
+      </div>
+      <details class="concept">
+        <summary>Cómo se forma el pasado de los regulares</summary>
+        <div class="table-wrap"><table class="rule-table">${REGULAR_RULES.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table></div>
+      </details>
+    </section>
+    <section class="card"><div id="verbs-list"></div></section>`;
+  renderVerbList();
+}
+
+function renderVerbList() {
+  const q = normalize(verbsFilter.q);
+  const { kind, open } = verbsFilter;
+  const rows = [
+    ...(kind !== "regular" ? IRREGULAR_VERBS.map((v) => [v, true]) : []),
+    ...(kind !== "irregular" ? REGULAR_VERBS.map((v) => [v, false]) : []),
+  ].filter(([v]) => !q || v.some((f) => f.toLowerCase().includes(q)))
+    .sort(([a], [b]) => a[0].localeCompare(b[0]));
+  $("#verbs-list").innerHTML = rows.length ? `
+    <div class="table-wrap"><table class="verbs">
+      <thead><tr><th>Base</th><th>Pasado</th><th>Participio</th><th>Significado</th></tr></thead>
+      <tbody>${rows.map(([v, irr]) => `
+        <tr class="verb-row ${open === v[0] ? "open" : ""}" data-verb="${v[0]}" tabindex="0" aria-expanded="${open === v[0]}">
+          <td><b>${v[0]}</b>${irr ? "" : ` <span class="muted small">reg.</span>`}${sounds(v, 0)}</td>
+          <td class="${irr ? "irr" : ""}">${v[3]}${sounds(v, 1)}</td><td class="${irr ? "irr" : ""}">${v[4]}${sounds(v, 2)}</td><td>${esc(v[5])}</td>
+        </tr>
+        ${open === v[0] ? `<tr class="conj-row"><td colspan="4">
+          <p class="small muted">${esc(v[0])} · ${v[1]} · ${v[2]} · ${v[3]} · ${v[4]}
+            ${canSpeak ? `<button class="btn small" data-say="${esc([v[0], v[3], v[4]].join(". "))}">🔊 Escuchar</button>` : ""}</p>
+          <div class="table-wrap"><table class="rule-table conj">
+            <thead><tr><th></th><th>Afirmativa</th><th>Negativa</th><th>Pregunta</th></tr></thead>
+            <tbody>${conjugation(v).map(([t, ...cells]) => `<tr><th>${t}</th>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+          </table></div>
+        </td></tr>` : ""}`).join("")}
+      </tbody>
+    </table></div>` : `<p class="muted">No hay verbos que coincidan con «${esc(verbsFilter.q)}».</p>`;
+}
+
+function toggleVerb(base) {
+  verbsFilter.open = verbsFilter.open === base ? null : base;
+  renderVerbList();
+  document.querySelector(`tr[data-verb="${base}"]`)?.focus();
 }
 
 // ---------- Libreta de errores ----------
@@ -497,7 +709,8 @@ function renderMistakes() {
             <span class="muted small">${esc(TOPIC_BY_ID[ex.topic].name)} · ${fmt.format(new Date(m.at))}</span>
             ${done ? `<span class="badge">✓ Superado</span>` : ""}
           </div>
-          <p class="mistake-line">${mistakeLine(ex)}</p>
+          <p class="mistake-line">${mistakeLine(ex)} ${sayBtn(fullSentence(ex))}</p>
+          ${translationOf(ex) ? `<p class="small es">${esc(translationOf(ex))}</p>` : ""}
           ${yours ? `<p class="small">Tu respuesta: <span class="bad">${esc(yours)}</span></p>` : ""}
           <p class="small">${ex.explanation}</p>
           ${knownWrongWhy(ex, m.given) ? `<p class="small muted">${knownWrongWhy(ex, m.given)}</p>` : ""}
@@ -579,8 +792,8 @@ function renderProgress() {
 // ---------- Rutas ----------
 // Cada pantalla tiene su #ruta para que los botones atrás/adelante del navegador funcionen.
 
-const ROUTES = { home: "inicio", mistakes: "errores", progress: "progreso" };
-const RENDER = { inicio: renderHome, errores: renderMistakes, progreso: renderProgress };
+const ROUTES = { home: "inicio", verbs: "verbos", mistakes: "errores", progress: "progreso" };
+const RENDER = { inicio: renderHome, verbos: renderVerbs, errores: renderMistakes, progreso: renderProgress };
 
 function go(name) {
   const hash = "#" + ROUTES[name];
@@ -594,6 +807,8 @@ function route() {
     // Sin sesión activa (por ejemplo, al volver con "adelante") no hay nada que mostrar.
     if (session) renderQuestion();
     else location.replace("#inicio");
+  } else if (r.startsWith("regla/")) {
+    renderRulePage(r.slice("regla/".length));
   } else {
     (RENDER[r] || renderHome)();
   }
@@ -604,13 +819,17 @@ window.addEventListener("hashchange", route);
 // ---------- Eventos ----------
 
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("button, label");
+  const t = e.target.closest("button, label, tr[data-verb]");
   if (!t) return;
   if (t.dataset.nav) go(t.dataset.nav);
+  else if (t.dataset.say) speak(t.dataset.say);
+  else if (t.dataset.verb) toggleVerb(t.dataset.verb);
+  else if (t.dataset.verbsKind) { verbsFilter.kind = t.dataset.verbsKind; renderVerbs(); }
   else if (t.dataset.start) startSession(t.dataset.start, t.dataset.topic);
-  else if (t.dataset.rule) { const r = $(`#rule-${t.dataset.rule}`); r.hidden = !r.hidden; }
+  else if (t.dataset.read) location.hash = "regla/" + t.dataset.read;
   else if (t.id === "show-rule") { const r = $("#q-rule"); r.hidden = !r.hidden; }
   else if (t.id === "hint-btn") showHint();
+  else if (t.id === "es-btn") showTranslation();
   else if (t.id === "skip") answer(null);
   else if (t.dataset.opt !== undefined) answer(session.shuffled[+t.dataset.opt]);
   else if (t.dataset.part !== undefined) answer(+t.dataset.part);
@@ -635,7 +854,12 @@ document.addEventListener("change", (e) => {
     .catch(() => alert("No se pudo leer el archivo."));
 });
 
+document.addEventListener("input", (e) => {
+  if (e.target.id === "verbs-q") { verbsFilter.q = e.target.value; verbsFilter.open = null; renderVerbList(); }
+});
+
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.dataset?.verb) { toggleVerb(e.target.dataset.verb); return; }
   if (!session || session.done) return;
   if (e.key === "Enter") {
     if (session.answered && session.mode !== "placement") { e.preventDefault(); next(); }
