@@ -182,7 +182,7 @@ td:nth-child(n+3), th:nth-child(n+3) { text-align: right; }
 .rule h4 { margin: 14px 0 6px; font-size: .92rem; }
 
 /* Pantalla de lectura de la regla */
-.rule-page { max-width: 760px; margin-left: auto; margin-right: auto; padding: 24px 28px; }
+.rule-page { padding: 24px 28px; }
 .rule-page .back { margin-left: -12px; }
 .rule-page h1 { margin: 2px 0 16px; font-size: 1.6rem; line-height: 1.25; }
 .rule-body { font-size: 1.03rem; line-height: 1.65; }
@@ -194,7 +194,7 @@ td:nth-child(n+3), th:nth-child(n+3) { text-align: right; }
 .rule-body .concept-block ul { padding-left: 22px; }
 .rule-body .typical li { margin: 8px 0; }
 .rule-body .typical .small { display: block; }
-.rule-pager { max-width: 760px; margin: 0 auto 20px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rule-pager { margin: 0 0 20px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 @media (max-width: 560px) {
   .rule-page { padding: 18px 16px; }
   .rule-page h1 { font-size: 1.35rem; }
