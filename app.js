@@ -268,6 +268,7 @@ function renderRulePage(topicId) {
       <div class="rule-body">${renderRule(t)}</div>
       <div class="hero-actions">
         <button class="btn primary" data-start="topic" data-topic="${t.id}">Practicar este tema</button>
+        ${VERB_TOPICS.includes(t.id) ? `<button class="btn" data-nav="verbs">Ver lista de verbos</button>` : ""}
       </div>
     </article>
     <div class="rule-pager">
@@ -490,6 +491,105 @@ function mistakeLine(ex) {
   return esc(ex.prompt).replace(/ \([^)]*\)/, "").replace("___", `<b>${esc(ex.answers[0])}</b>`);
 }
 
+// ---------- Verbos ----------
+
+const VERB_TOPICS = ["past-simple", "past-cont", "present-perfect", "pp-vs-past", "passive"];
+let verbsFilter = { q: "", kind: "all", open: null };
+
+// Un verbo en los tiempos que se practican, con la 1.ª y la 3.ª persona (la que cambia).
+function conjugation(v) {
+  const [base, s, ing] = v;
+  const [past, pp] = [v[3], v[4]].map((f) => f.split(" / ")[0]);
+  if (base === "be") return [
+    ["Present simple", "I <b>am</b> · she <b>is</b> · they <b>are</b>", "I'm <b>not</b> · she <b>isn't</b>", "<b>Are</b> you…? · <b>Is</b> she…?"],
+    ["Past simple", "I <b>was</b> · they <b>were</b>", "I <b>wasn't</b> · they <b>weren't</b>", "<b>Was</b> she…? · <b>Were</b> you…?"],
+    ["Present perfect", "I've <b>been</b> · she's <b>been</b>", "I <b>haven't been</b> · she <b>hasn't been</b>", "<b>Have</b> you <b>been</b>…?"],
+    ["Future (will)", "I'll <b>be</b>", "I <b>won't be</b>", "<b>Will</b> you <b>be</b>…?"],
+    ["Going to", "I'm <b>going to be</b>", "I'm <b>not going to be</b>", "<b>Are</b> you <b>going to be</b>…?"],
+  ];
+  return [
+    ["Present simple", `I <b>${base}</b> · she <b>${s}</b>`, `I <b>don't ${base}</b> · she <b>doesn't ${base}</b>`, `<b>Do</b> you <b>${base}</b>? · <b>Does</b> she <b>${base}</b>?`],
+    ["Present continuous", `I'm <b>${ing}</b> · she's <b>${ing}</b>`, `I'm <b>not ${ing}</b> · she <b>isn't ${ing}</b>`, `<b>Are</b> you <b>${ing}</b>?`],
+    ["Past simple", `I <b>${past}</b> · she <b>${past}</b>`, `I <b>didn't ${base}</b>`, `<b>Did</b> you <b>${base}</b>?`],
+    ["Past continuous", `I <b>was ${ing}</b> · they <b>were ${ing}</b>`, `I <b>wasn't ${ing}</b>`, `<b>Were</b> you <b>${ing}</b>?`],
+    ["Present perfect", `I've <b>${pp}</b> · she's <b>${pp}</b>`, `I <b>haven't ${pp}</b> · she <b>hasn't ${pp}</b>`, `<b>Have</b> you <b>${pp}</b>? · <b>Has</b> she <b>${pp}</b>?`],
+    ["Future (will)", `I'll <b>${base}</b>`, `I <b>won't ${base}</b>`, `<b>Will</b> you <b>${base}</b>?`],
+    ["Going to", `I'm <b>going to ${base}</b>`, `I'm <b>not going to ${base}</b>`, `<b>Are</b> you <b>going to ${base}</b>?`],
+  ];
+}
+
+// Pronunciación escrita de la forma i (0 base, 1 pasado, 2 participio). En los regulares, el participio suena como el pasado.
+function sounds(v, i) {
+  const p = (VERB_PRON[v[0]] || "").split(" · ");
+  const s = p[Math.min(i, p.length - 1)];
+  return s ? `<span class="sound">${esc(s)}</span>` : "";
+}
+
+const canSpeak = "speechSynthesis" in window;
+function speak(text) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US";
+  u.rate = 0.85;
+  speechSynthesis.speak(u);
+}
+
+function renderVerbs() {
+  setNav("verbs");
+  session = null;
+  const kinds = [["all", "Todos"], ["irregular", "Irregulares"], ["regular", "Regulares"]];
+  view.innerHTML = `
+    <section class="card">
+      <h2>Verbos</h2>
+      <p class="muted small">Base, pasado y participio de ${IRREGULAR_VERBS.length} verbos irregulares y ${REGULAR_VERBS.length} regulares frecuentes. Tocá un verbo para ver cómo se conjuga${canSpeak ? " y escucharlo" : ""}.</p>
+      <p class="muted small">Debajo de cada forma está cómo suena, escrito a la española. Es aproximado: la tilde marca la sílaba fuerte, <b>z</b> es con la lengua entre los dientes (<i>think</i>), <b>sh</b> como en «shampoo» y <b>j</b> es una h suave, como un suspiro (<i>have</i>).</p>
+      <div class="filters">
+        <input type="search" id="verbs-q" placeholder="Buscar en inglés o español" value="${esc(verbsFilter.q)}" autocomplete="off" aria-label="Buscar verbo">
+        <div class="seg">${kinds.map(([k, l]) => `<button class="btn small ${verbsFilter.kind === k ? "primary" : ""}" data-verbs-kind="${k}">${l}</button>`).join("")}</div>
+      </div>
+      <details class="concept">
+        <summary>Cómo se forma el pasado de los regulares</summary>
+        <div class="table-wrap"><table class="rule-table">${REGULAR_RULES.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table></div>
+      </details>
+    </section>
+    <section class="card"><div id="verbs-list"></div></section>`;
+  renderVerbList();
+}
+
+function renderVerbList() {
+  const q = normalize(verbsFilter.q);
+  const { kind, open } = verbsFilter;
+  const rows = [
+    ...(kind !== "regular" ? IRREGULAR_VERBS.map((v) => [v, true]) : []),
+    ...(kind !== "irregular" ? REGULAR_VERBS.map((v) => [v, false]) : []),
+  ].filter(([v]) => !q || v.some((f) => f.toLowerCase().includes(q)))
+    .sort(([a], [b]) => a[0].localeCompare(b[0]));
+  $("#verbs-list").innerHTML = rows.length ? `
+    <div class="table-wrap"><table class="verbs">
+      <thead><tr><th>Base</th><th>Pasado</th><th>Participio</th><th>Significado</th></tr></thead>
+      <tbody>${rows.map(([v, irr]) => `
+        <tr class="verb-row ${open === v[0] ? "open" : ""}" data-verb="${v[0]}" tabindex="0" aria-expanded="${open === v[0]}">
+          <td><b>${v[0]}</b>${irr ? "" : ` <span class="muted small">reg.</span>`}${sounds(v, 0)}</td>
+          <td class="${irr ? "irr" : ""}">${v[3]}${sounds(v, 1)}</td><td class="${irr ? "irr" : ""}">${v[4]}${sounds(v, 2)}</td><td>${esc(v[5])}</td>
+        </tr>
+        ${open === v[0] ? `<tr class="conj-row"><td colspan="4">
+          <p class="small muted">${esc(v[0])} · ${v[1]} · ${v[2]} · ${v[3]} · ${v[4]}
+            ${canSpeak ? `<button class="btn small" data-say="${esc([v[0], v[3], v[4]].join(". "))}">🔊 Escuchar</button>` : ""}</p>
+          <div class="table-wrap"><table class="rule-table conj">
+            <thead><tr><th></th><th>Afirmativa</th><th>Negativa</th><th>Pregunta</th></tr></thead>
+            <tbody>${conjugation(v).map(([t, ...cells]) => `<tr><th>${t}</th>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+          </table></div>
+        </td></tr>` : ""}`).join("")}
+      </tbody>
+    </table></div>` : `<p class="muted">No hay verbos que coincidan con «${esc(verbsFilter.q)}».</p>`;
+}
+
+function toggleVerb(base) {
+  verbsFilter.open = verbsFilter.open === base ? null : base;
+  renderVerbList();
+  document.querySelector(`tr[data-verb="${base}"]`)?.focus();
+}
+
 // ---------- Libreta de errores ----------
 
 function renderMistakes() {
@@ -605,8 +705,8 @@ function renderProgress() {
 // ---------- Rutas ----------
 // Cada pantalla tiene su #ruta para que los botones atrás/adelante del navegador funcionen.
 
-const ROUTES = { home: "inicio", mistakes: "errores", progress: "progreso" };
-const RENDER = { inicio: renderHome, errores: renderMistakes, progreso: renderProgress };
+const ROUTES = { home: "inicio", verbs: "verbos", mistakes: "errores", progress: "progreso" };
+const RENDER = { inicio: renderHome, verbos: renderVerbs, errores: renderMistakes, progreso: renderProgress };
 
 function go(name) {
   const hash = "#" + ROUTES[name];
@@ -632,9 +732,12 @@ window.addEventListener("hashchange", route);
 // ---------- Eventos ----------
 
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("button, label");
+  const t = e.target.closest("button, label, tr[data-verb]");
   if (!t) return;
   if (t.dataset.nav) go(t.dataset.nav);
+  else if (t.dataset.say) speak(t.dataset.say);
+  else if (t.dataset.verb) toggleVerb(t.dataset.verb);
+  else if (t.dataset.verbsKind) { verbsFilter.kind = t.dataset.verbsKind; renderVerbs(); }
   else if (t.dataset.start) startSession(t.dataset.start, t.dataset.topic);
   else if (t.dataset.read) location.hash = "regla/" + t.dataset.read;
   else if (t.id === "show-rule") { const r = $("#q-rule"); r.hidden = !r.hidden; }
@@ -663,7 +766,12 @@ document.addEventListener("change", (e) => {
     .catch(() => alert("No se pudo leer el archivo."));
 });
 
+document.addEventListener("input", (e) => {
+  if (e.target.id === "verbs-q") { verbsFilter.q = e.target.value; verbsFilter.open = null; renderVerbList(); }
+});
+
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.dataset?.verb) { toggleVerb(e.target.dataset.verb); return; }
   if (!session || session.done) return;
   if (e.key === "Enter") {
     if (session.answered && session.mode !== "placement") { e.preventDefault(); next(); }

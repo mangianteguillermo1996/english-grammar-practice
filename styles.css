@@ -258,3 +258,17 @@ input[type="number"] { width: 6em; margin-left: 6px; }
 .mistake-line { font-size: 1.08rem; }
 .mistake.overcome { opacity: .6; }
 .placement td:nth-child(2), .placement th:nth-child(2) { text-align: right; }
+
+/* Verbos */
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+#verbs-q { font: inherit; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; flex: 1 1 220px; max-width: 360px; }
+table.verbs td, table.verbs th { text-align: left; vertical-align: top; }
+.verb-row { cursor: pointer; }
+.verb-row:hover, .verb-row.open { background: var(--accent-soft); }
+.verb-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.verb-row .irr { font-weight: 600; }
+.sound { display: block; color: var(--muted); font-size: .82rem; font-style: italic; font-weight: 400; }
+.conj-row > td { background: var(--accent-soft); padding: 4px 12px 14px; }
+.conj-row p { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rule-table.conj { border: 1px solid var(--border); }
+.rule-table.conj td, .rule-table.conj thead th { white-space: nowrap; text-align: left; }
