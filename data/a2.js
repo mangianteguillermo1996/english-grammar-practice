@@ -145,7 +145,7 @@ addExercises("quantifiers", [
   ["err", ["I need", "an", "advice", "about my job."], 1, "some", "<i>Advice</i> es incontable: no lleva <i>an</i> → <b>some advice</b>.", "countable"],
   ["err", ["There", "are", "a little", "chairs in the room."], 2, "a few", "Chairs es contable → <b>a few</b>.", "few"],
   ["err", ["We", "haven't got", "some", "money."], 2, "any", "Negativa → <b>any</b>.", "someany"],
-  ["err", ["She", "gave me", "many", "informations."], 3, "information (+ a lot of)", "<i>Information</i> es incontable: no tiene plural. <b>a lot of information</b>.", "countable"],
+  ["err", ["She", "gave me", "many", "informations."], 3, "information (+ a lot of)", "<i>Information</i> es incontable: no tiene plural. <b>a lot of information</b>.", "countable", "She gave me <b>a lot of information</b>."],
   ["mc", "My suitcase is heavy. I have too much ___.", ["luggages", "luggage", "baggages"], 1, "<i>Luggage</i> es incontable: no tiene plural.", "countable",
     { luggages: "Luggage es incontable: no lleva -s.", baggages: "Baggage también es incontable: sin -s." }],
   ["gap", "How ___ homework do you have tonight?", ["much"], "Homework es incontable → <b>much</b>.", "countable"],

@@ -17,6 +17,13 @@ progreso. Funciona sin instalar nada, sin cuenta y sin conexión a internet.
 - **Correcciones que explican**: por qué la respuesta correcta lo es, por qué la
   tuya no y más ejemplos del mismo caso. Si le errás por una letra, te avisa
   "Casi…" y te da otro intento.
+- **Traducción al español** de los ejercicios y de los ejemplos de cada regla.
+  En los ejercicios aparece después de responder, para no regalar la respuesta.
+- **Audio**: un botón 🔊 lee en inglés cada oración y cada verbo, con la voz del
+  navegador (no necesita internet ni cuenta).
+- **Lista de verbos**: 101 irregulares y 72 regulares con pasado, participio,
+  significado, pronunciación aproximada escrita a la española y su conjugación
+  en los tiempos que se practican.
 - **Pistas**: la primera letra de la respuesta, una opción tachada o la regla
   del tema. Un acierto con pista vuelve a aparecer al día siguiente.
 - **Repetición espaciada**: lo que fallás vuelve pronto, y lo que acertás vuelve
@@ -25,6 +32,9 @@ progreso. Funciona sin instalar nada, sin cuenta y sin conexión a internet.
   explicación. Un error queda superado cuando lo acertás dos veces seguidas.
 - **Test de nivel**: 34 preguntas que ordenan la hoja de ruta según lo que ya
   sabés.
+- **Reglas para leer tranquilo**: cada tema tiene su propia pantalla con la
+  estructura, los usos con ejemplos traducidos, las palabras señal y los errores
+  típicos de hispanohablantes.
 - **Hábito**: meta diaria, días de racha, gráfico de los últimos 14 días y
   dominio por tema.
 - **Modo claro y oscuro**, según la configuración del sistema.
@@ -59,6 +69,8 @@ styles.css        estilos (modo claro y oscuro)
 data/topics.js    temas: reglas, estructura, palabras señal, errores típicos y conceptos
 data/a2.js        ejercicios escritos a mano de A2
 data/b1.js        ejercicios escritos a mano de A2+ / B1
+data/verbs.js     verbos: formas, significado y pronunciación
+data/es.js        traducciones al español
 generators.js     plantillas que generan ejercicios nuevos
 progress.js       progreso, repetición espaciada, estadísticas y respaldo
 app.js            corrección, sesiones, pantallas y navegación
@@ -76,13 +88,14 @@ Cada tema agrega sus ejercicios con `addExercises(tema, [...])` en
 ```js
 ["mc",  "She ___ to work every day.", ["goes", "is going", "go"], 0, "Explicación…", "habit", { "is going": "Por qué está mal…" }]
 ["gap", "I ___ (not / like) coffee.", ["don't like", "do not like"], "Explicación…", "habit"]
-["err", ["She", "don't", "like", "coffee."], 1, "doesn't", "Explicación…", "habit"]
+["err", ["She", "don't", "like", "coffee."], 1, "doesn't", "Explicación…", "habit"]  // + oración corregida opcional
 ["rw",  "Nobody cleans this room.", "This room", ["isn't cleaned", "is not cleaned"], "Explicación…", "present"]
 ```
 
 - El penúltimo campo (o el último, en `mc`) es el **concepto** del tema que
   explica el caso. Tiene que existir en `concepts` de `data/topics.js`.
 - En opción múltiple, cada opción incorrecta lleva su explicación.
+- Cada ejercicio nuevo lleva su traducción en `data/es.js`, en la misma posición.
 - Los ejercicios nuevos van **siempre al final** de la lista del tema. El id de
   cada ejercicio es `tema:posición`: insertar en el medio o reordenar mezclaría
   el historial de repaso de quienes ya practicaron.

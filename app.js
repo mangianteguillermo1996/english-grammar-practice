@@ -140,25 +140,51 @@ function setNav(name) {
 }
 
 function renderRule(t) {
-  const concepts = Object.values(t.concepts || {});
   return `
     <p class="rule-intro">${t.intro}</p>
     <h4>Estructura</h4>
     <div class="table-wrap"><table class="rule-table">${t.structure.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table></div>
     <h4>Cuándo se usa</h4>
-    ${concepts.map((c) => conceptBlock(c)).join("")}
+    ${Object.entries(t.concepts || {}).map(([k, c]) => conceptBlock(t.id, k, c)).join("")}
     <h4>Palabras señal</h4>
     <p>${t.signals}</p>
     <h4>Errores típicos</h4>
     <ul class="typical">${t.mistakes.map(([bad, good, why]) => `<li><span class="bad">✗ ${esc(bad)}</span> → <span class="good">✓ ${esc(good)}</span> <span class="muted small">${esc(why)}</span></li>`).join("")}</ul>`;
 }
 
-const conceptBlock = (c) => `
+const conceptBlock = (topicId, key, c) => `
   <div class="concept-block">
     <strong>${c.title}</strong>
     <p>${c.text}</p>
-    <ul>${c.examples.map((e) => `<li>${e}</li>`).join("")}</ul>
+    ${exampleList(topicId, key, c.examples)}
   </div>`;
+
+// ---------- Traducción y audio ----------
+
+const stripTags = (html) => html.replace(/<[^>]+>/g, "");
+// Lo que lee la voz: sin etiquetas ni aclaraciones entre paréntesis.
+const sayable = (html) => stripTags(html).replace(/\s*\([^)]*\)/g, "").replace(/[«»"]/g, "").trim();
+const sayBtn = (text) => (canSpeak ? `<button class="say" data-say="${esc(sayable(text))}" title="Escuchar" aria-label="Escuchar">🔊</button>` : "");
+
+// Ejemplos en inglés con su traducción debajo.
+function exampleList(topicId, key, examples) {
+  const es = ES[topicId]?.c[key] || [];
+  return `<ul class="examples">${examples.map((e, i) => `<li>${e} ${sayBtn(e)}${es[i] ? `<span class="es">${esc(es[i])}</span>` : ""}</li>`).join("")}</ul>`;
+}
+
+// La oración completa y correcta de un ejercicio.
+function fullSentence(ex) {
+  if (ex.type === "err") return ex.fixed || ex.parts.map((p, i) => (i === ex.answers[0] ? ex.correction : p)).join(" ");
+  if (ex.type === "rw") return `${ex.start} ${ex.answers[0]}`;
+  return ex.prompt.replace(/ \([^)]*\)/, "").replace("___", ex.answers[0]);
+}
+
+// Solo los ejercicios escritos a mano tienen traducción (los generados se arman al azar).
+function translationOf(ex) {
+  if (!EXERCISE_BY_ID[ex.id]) return null;
+  const [topic, i] = ex.id.split(":");
+  return ES[topic]?.ex[+i] || null;
+}
 
 const conceptOf = (ex) => TOPIC_BY_ID[ex.topic].concepts?.[ex.concept];
 const blank = (html) => html.replace("___", `<span class="blank">&nbsp;</span>`);
@@ -416,6 +442,7 @@ function answer(given) {
     }
   }
   const c = conceptOf(ex);
+  const es = translationOf(ex), listen = sayBtn(fullSentence(ex));
   const last = session.i === session.items.length - 1;
   $("#hint").innerHTML = "";
   $("#feedback").innerHTML = `
@@ -424,11 +451,12 @@ function answer(given) {
       ${ok && ex.type === "mc" ? "" : `<p>Respuesta${ex.answers.length > 1 && ex.type === "gap" ? "s aceptadas" : ""}: <b>${esc(right)}</b></p>`}
       <p class="why"><span class="label">Por qué</span>${ex.explanation}</p>
       ${whyWrong ? `<p class="why"><span class="label">Tu respuesta</span>${whyWrong}</p>` : ""}
+      ${es || listen ? `<p class="why"><span class="label">${es ? "En español" : "Escuchar"}</span>${es ? esc(es) + " " : ""}${listen}</p>` : ""}
     </div>
     ${c ? `<details class="concept" ${ok ? "" : "open"}>
       <summary>Más ejemplos: ${c.title}</summary>
       <p>${c.text}</p>
-      <ul>${c.examples.map((e) => `<li>${e}</li>`).join("")}</ul>
+      ${exampleList(ex.topic, ex.concept, c.examples)}
     </details>` : ""}
     <button class="btn primary" id="next">${last ? "Ver resultado" : "Siguiente"} <kbd>Enter</kbd></button>`;
   $("#next").focus();
@@ -486,7 +514,7 @@ function renderPlacementResult() {
 }
 
 function mistakeLine(ex) {
-  if (ex.type === "err") return ex.parts.map((p, i) => (i === ex.answers[0] ? `<b>${esc(ex.correction)}</b>` : esc(p))).join(" ");
+  if (ex.type === "err") return ex.fixed || ex.parts.map((p, i) => (i === ex.answers[0] ? `<b>${esc(ex.correction)}</b>` : esc(p))).join(" ");
   if (ex.type === "rw") return `${esc(ex.source)} → ${esc(ex.start)} <b>${esc(ex.answers[0])}</b>`;
   return esc(ex.prompt).replace(/ \([^)]*\)/, "").replace("___", `<b>${esc(ex.answers[0])}</b>`);
 }
@@ -623,7 +651,8 @@ function renderMistakes() {
             <span class="muted small">${esc(TOPIC_BY_ID[ex.topic].name)} · ${fmt.format(new Date(m.at))}</span>
             ${done ? `<span class="badge">✓ Superado</span>` : ""}
           </div>
-          <p class="mistake-line">${mistakeLine(ex)}</p>
+          <p class="mistake-line">${mistakeLine(ex)} ${sayBtn(fullSentence(ex))}</p>
+          ${translationOf(ex) ? `<p class="small es">${esc(translationOf(ex))}</p>` : ""}
           ${yours ? `<p class="small">Tu respuesta: <span class="bad">${esc(yours)}</span></p>` : ""}
           <p class="small">${ex.explanation}</p>
           ${knownWrongWhy(ex, m.given) ? `<p class="small muted">${knownWrongWhy(ex, m.given)}</p>` : ""}

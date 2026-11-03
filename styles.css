@@ -272,3 +272,13 @@ table.verbs td, table.verbs th { text-align: left; vertical-align: top; }
 .conj-row p { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rule-table.conj { border: 1px solid var(--border); }
 .rule-table.conj td, .rule-table.conj thead th { white-space: nowrap; text-align: left; }
+
+/* Traducción y audio */
+.examples li { margin: 6px 0; }
+.es { display: block; color: var(--muted); font-size: .9em; font-style: italic; }
+p.es { margin: 2px 0 6px; }
+.say {
+  border: none; background: transparent; cursor: pointer; padding: 0 4px; font-size: .95em;
+  line-height: 1; vertical-align: baseline; border-radius: 6px; opacity: .75;
+}
+.say:hover, .say:focus-visible { opacity: 1; background: var(--accent-soft); }

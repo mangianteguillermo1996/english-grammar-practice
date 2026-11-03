@@ -11,11 +11,14 @@ con doble clic en `index.html` (`file://`) y se puede publicar tal cual en Netli
 - `data/topics.js`: niveles, temas (intro, estructura, palabras señal, errores
   típicos, conceptos) y `addExercises()`.
 - `data/a2.js`, `data/b1.js`: ejercicios escritos a mano.
+- `data/verbs.js`: verbos regulares e irregulares con sus formas, significado y
+  pronunciación aproximada.
+- `data/es.js`: traducciones al español (ver más abajo).
 - `generators.js`: plantillas que generan ejercicios nuevos para cada tema.
 - `progress.js`: progreso en `localStorage`, repetición espaciada, estadísticas,
   test de nivel y exportación/importación.
 - `app.js`: corrección, armado de sesiones, vistas y rutas por hash (`#inicio`,
-  `#errores`, `#progreso`, `#practica`).
+  `#errores`, `#progreso`, `#practica`, `#verbos`, `#regla/<tema>`).
 
 Los datos van en `.js`, no en `.json`, porque desde `file://` el navegador no
 permite `fetch`. Los scripts se cargan en orden en `index.html`.
@@ -42,11 +45,24 @@ permite `fetch`. Los scripts se cargan en orden en `index.html`.
 ```
 ["mc",  prompt, opciones, índiceCorrecto, explicación, concepto, { opciónIncorrecta: porqué }]
 ["gap", prompt, respuestas, explicación, concepto]
-["err", partes, índiceDelError, corrección, explicación, concepto]
+["err", partes, índiceDelError, corrección, explicación, concepto, oraciónCorregida?]
 ["rw",  oraciónOriginal, comienzo, respuestas, explicación, concepto]
 ```
 
 Las claves con apóstrofo van entre comillas (`"didn't": "..."`).
+
+En `err`, la oración corregida completa (con `<b>` en lo que cambia) es opcional: hace
+falta cuando reemplazar la parte marcada por la corrección no arma una oración
+correcta (por ejemplo, si la corrección tiene alternativas con `/` o cambia más de
+una parte).
+
+## Traducciones
+
+`data/es.js` tiene la traducción al español de cada ejemplo de concepto (`c`) y de
+cada ejercicio escrito a mano (`ex`, en el mismo orden que los ejercicios del tema).
+Todo ejercicio o ejemplo nuevo lleva su traducción en la misma posición; si falta,
+la app no la muestra, pero el chequeo de cantidades falla. Los ejercicios generados
+no tienen traducción.
 
 ## Verificar cambios
 
