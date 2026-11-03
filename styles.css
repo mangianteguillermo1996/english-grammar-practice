@@ -180,6 +180,26 @@ td:nth-child(n+3), th:nth-child(n+3) { text-align: right; }
 
 /* Reglas ampliadas */
 .rule h4 { margin: 14px 0 6px; font-size: .92rem; }
+
+/* Pantalla de lectura de la regla */
+.rule-page { max-width: 760px; margin-left: auto; margin-right: auto; padding: 24px 28px; }
+.rule-page .back { margin-left: -12px; }
+.rule-page h1 { margin: 2px 0 16px; font-size: 1.6rem; line-height: 1.25; }
+.rule-body { font-size: 1.03rem; line-height: 1.65; }
+.rule-body h4 { margin: 28px 0 10px; font-size: 1.12rem; }
+.rule-body .rule-intro { font-size: 1.1rem; }
+.rule-body .rule-table { font-size: 1rem; border: 1px solid var(--border); }
+.rule-body .rule-table th, .rule-body .rule-table td { padding: 10px 14px; }
+.rule-body .concept-block { background: var(--accent-soft); padding: 12px 16px; margin: 10px 0; }
+.rule-body .concept-block ul { padding-left: 22px; }
+.rule-body .typical li { margin: 8px 0; }
+.rule-body .typical .small { display: block; }
+.rule-pager { max-width: 760px; margin: 0 auto 20px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .rule-page { padding: 18px 16px; }
+  .rule-page h1 { font-size: 1.35rem; }
+  .rule-pager .btn { flex: 1; }
+}
 .rule-intro { font-weight: 500; }
 .rule-table { font-size: .9rem; background: var(--surface); border-radius: 8px; }
 .rule-table th { white-space: nowrap; width: 1%; color: var(--text); }

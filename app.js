@@ -245,10 +245,36 @@ function topicCard(t) {
       <p class="muted small">${s.total ? `Dominio ${s.mastery}% · ${Math.round(s.acc * 100)}% en los últimos ${s.recentN}` : "Sin practicar todavía"}</p>
       <div class="topic-actions">
         <button class="btn primary small" data-start="topic" data-topic="${t.id}">Practicar</button>
-        <button class="btn ghost small" data-rule="${t.id}">Ver regla</button>
+        <button class="btn ghost small" data-read="${t.id}">Ver regla</button>
       </div>
-      <div class="rule" id="rule-${t.id}" hidden>${renderRule(t)}</div>
     </article>`;
+}
+
+// ---------- Regla (pantalla de lectura) ----------
+
+function renderRulePage(topicId) {
+  const t = TOPIC_BY_ID[topicId];
+  if (!t) { location.replace("#inicio"); return; }
+  setNav("");
+  session = null;
+  const i = TOPICS.indexOf(t), prev = TOPICS[i - 1], nxt = TOPICS[i + 1];
+  const s = topicStats(t.id);
+  const level = LEVELS.find((l) => l.id === t.level);
+  view.innerHTML = `
+    <article class="card rule-page">
+      <button class="btn ghost small back" data-nav="home">← Temas</button>
+      <p class="muted small">${esc(level.name)} · ${s.total ? `Dominio ${s.mastery}%` : "Sin practicar todavía"}</p>
+      <h1>${esc(t.name)}</h1>
+      <div class="rule-body">${renderRule(t)}</div>
+      <div class="hero-actions">
+        <button class="btn primary" data-start="topic" data-topic="${t.id}">Practicar este tema</button>
+      </div>
+    </article>
+    <div class="rule-pager">
+      ${prev ? `<button class="btn" data-read="${prev.id}">← ${esc(prev.name)}</button>` : "<span></span>"}
+      ${nxt ? `<button class="btn" data-read="${nxt.id}">${esc(nxt.name)} →</button>` : ""}
+    </div>`;
+  window.scrollTo(0, 0);
 }
 
 // ---------- Sesión ----------
@@ -594,6 +620,8 @@ function route() {
     // Sin sesión activa (por ejemplo, al volver con "adelante") no hay nada que mostrar.
     if (session) renderQuestion();
     else location.replace("#inicio");
+  } else if (r.startsWith("regla/")) {
+    renderRulePage(r.slice("regla/".length));
   } else {
     (RENDER[r] || renderHome)();
   }
@@ -608,7 +636,7 @@ document.addEventListener("click", (e) => {
   if (!t) return;
   if (t.dataset.nav) go(t.dataset.nav);
   else if (t.dataset.start) startSession(t.dataset.start, t.dataset.topic);
-  else if (t.dataset.rule) { const r = $(`#rule-${t.dataset.rule}`); r.hidden = !r.hidden; }
+  else if (t.dataset.read) location.hash = "regla/" + t.dataset.read;
   else if (t.id === "show-rule") { const r = $("#q-rule"); r.hidden = !r.hidden; }
   else if (t.id === "hint-btn") showHint();
   else if (t.id === "skip") answer(null);
