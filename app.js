@@ -179,6 +179,50 @@ function fullSentence(ex) {
   return ex.prompt.replace(/ \([^)]*\)/, "").replace("___", ex.answers[0]);
 }
 
+// Lo que lee la voz antes de responder: la oración con una pausa en el espacio, sin la pista entre paréntesis.
+// En "encontrar el error" no se lee, para no escuchar la oración mal dicha.
+function promptSpeech(ex) {
+  if (ex.type === "err") return "";
+  if (ex.type === "rw") return ex.source;
+  return ex.prompt.replace(/ \([^)]*\)/g, "").replace("___", "...");
+}
+
+// Pronunciación escrita de una opción, solo si se conocen todas sus palabras.
+let pronCache = null;
+function pronMap() {
+  if (pronCache) return pronCache;
+  const m = {};
+  const add = (w, p) => { if (w && p && !(w in m)) m[w] = p; };
+  const pair = (forms, pr) => { const q = (pr || "").split(" / "); forms.split(" / ").forEach((f, i) => add(f, q[i] || q[0])); };
+  for (const [base, s, ing, past, pp] of [...IRREGULAR_VERBS, ...REGULAR_VERBS]) {
+    const p = (VERB_PRON[base] || "").split(" · ");
+    if (!p[0]) continue;
+    add(base, p[0]);
+    pair(past, p[1]);
+    pair(pp, p[2] || p[1]);
+    add(ing, p[0] + "ing");
+    const sibilant = /(ch|sh|x|ss|z)es$/.test(s) || (base.endsWith("e") && /[cgsz]es$/.test(s));
+    add(s, p[0] + (sibilant ? "is" : "s"));
+  }
+  pronCache = { ...m, ...WORD_PRON };
+  return pronCache;
+}
+function pronOf(text) {
+  const m = pronMap();
+  const words = text.toLowerCase().replace(/[’]/g, "'").replace(/[.,!?;:]/g, "").split(/\s+/).filter(Boolean);
+  const out = words.map((w) => m[w]);
+  return out.length && out.every(Boolean) ? out.join(" ") : null;
+}
+
+// Significado y pronunciación de los verbos que aparecen entre paréntesis en la consigna.
+function glossary(ex) {
+  const hint = (ex.prompt || "").match(/\(([^)]*)\)/);
+  if (!hint) return "";
+  const verbs = [...IRREGULAR_VERBS, ...REGULAR_VERBS];
+  const found = hint[1].toLowerCase().split(/[\s/]+/).map((w) => verbs.find((v) => v[0] === w)).filter(Boolean);
+  return found.length ? `<p class="gloss">${found.map((v) => `<b>${v[0]}</b> <i class="muted">${esc(pronOf(v[0]) || "")}</i> = ${esc(v[5])} ${sayBtn(v[0])}`).join(" · ")}</p>` : "";
+}
+
 // Solo los ejercicios escritos a mano tienen traducción (los generados se arman al azar).
 function translationOf(ex) {
   if (!EXERCISE_BY_ID[ex.id]) return null;
@@ -319,20 +363,23 @@ function renderQuestion() {
   const ex = session.items[session.i];
   const topic = TOPIC_BY_ID[ex.topic];
   const test = session.mode === "placement";
-  Object.assign(session, { answered: false, hinted: false, retried: false });
+  Object.assign(session, { answered: false, hinted: false, hintShown: false, retried: false });
   let body = "";
   if (ex.type === "mc") {
     session.shuffled = shuffle(ex.options);
-    body = `<p class="prompt">${blank(esc(ex.prompt))}</p>
-      <div class="options">${session.shuffled.map((o, i) => `<button class="option" data-opt="${i}"><kbd>${i + 1}</kbd>${esc(o)}</button>`).join("")}</div>`;
+    // Solo si se conocen todas: una opción sin pronunciación delataría una forma inventada (goed, leaved).
+    const prons = session.shuffled.map(pronOf);
+    body = `<p class="prompt">${blank(esc(ex.prompt))} ${sayBtn(promptSpeech(ex))}</p>${glossary(ex)}
+      <div class="options">${session.shuffled.map((o, i) => { const pr = prons.every(Boolean) && prons[i]; return `<div class="option-row">
+        <button class="option" data-opt="${i}"><kbd>${i + 1}</kbd><span>${esc(o)}${pr ? `<span class="sound">${esc(pr)}</span>` : ""}</span></button>${sayBtn(o)}</div>`; }).join("")}</div>`;
   } else if (ex.type === "gap") {
     const hint = ex.options ? `<p class="muted small">Opciones: ${ex.options.map(esc).join(" / ")}</p>` : "";
     const parts = esc(ex.prompt).split("___");
-    body = `<p class="prompt">${parts[0]}<input id="gap" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta">${parts.slice(1).join("___")}</p>
-      ${hint}<button class="btn primary" id="check">Comprobar</button>`;
+    body = `<p class="prompt">${parts[0]}<input id="gap" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Respuesta">${parts.slice(1).join("___")} ${sayBtn(promptSpeech(ex))}</p>
+      ${glossary(ex)}${hint}<button class="btn primary" id="check">Comprobar</button>`;
   } else if (ex.type === "rw") {
     body = `<p class="muted">Reescribí la oración empezando como se indica, sin cambiar el significado.</p>
-      <p class="source">${esc(ex.source)}</p>
+      <p class="source">${esc(ex.source)} ${sayBtn(ex.source)}</p>
       <p class="prompt rw-line"><span class="rw-start">${esc(ex.start)}</span><input id="gap" class="wide" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Continuación"></p>
       <button class="btn primary" id="check">Comprobar</button>`;
   } else {
@@ -345,6 +392,7 @@ function renderQuestion() {
         <span class="muted small">${session.i + 1} / ${session.items.length} · ${test ? "Test de nivel · " : ""}${esc(topic.name)}</span>
         <span>
           ${test ? `<button class="btn ghost small" id="skip">No sé</button>` : `
+          ${translationOf(ex) ? `<button class="btn ghost small" id="es-btn" title="Muestra la oración en español. Cuenta como pista.">🇪🇸 Traducción</button>` : ""}
           <button class="btn ghost small" id="hint-btn">💡 Pista</button>
           <button class="btn ghost small" id="show-rule">Regla</button>`}
         </span>
@@ -352,6 +400,7 @@ function renderQuestion() {
       <div class="progress-bar"><div style="width:${(session.i / session.items.length) * 100}%"></div></div>
       <div class="rule" id="q-rule" hidden>${renderRule(topic)}</div>
       ${body}
+      <div id="es-line"></div>
       <div id="hint"></div>
       <div id="feedback"></div>
     </section>`;
@@ -361,8 +410,8 @@ function renderQuestion() {
 
 function showHint() {
   const ex = session.items[session.i];
-  if (session.answered || session.hinted) return;
-  session.hinted = true;
+  if (session.answered || session.hintShown) return;
+  session.hintShown = session.hinted = true;
   $("#hint-btn").disabled = true;
   const c = conceptOf(ex);
   let specific = "";
@@ -382,6 +431,14 @@ function showHint() {
     specific = "Abrimos la regla del tema.";
   }
   $("#hint").innerHTML = `<div class="hint">💡 ${c ? `Fijate en: <b>${c.title}</b>. ` : ""}${specific}</div>`;
+}
+
+// La traducción da el tiempo verbal, así que cuenta como pista.
+function showTranslation() {
+  if (session.answered) return;
+  session.hinted = true;
+  $("#es-btn").disabled = true;
+  $("#es-line").innerHTML = `<p class="es-reveal">🇪🇸 ${esc(translationOf(session.items[session.i]))} <span class="muted small">(cuenta como pista)</span></p>`;
 }
 
 function answer(given) {
@@ -445,6 +502,7 @@ function answer(given) {
   const es = translationOf(ex), listen = sayBtn(fullSentence(ex));
   const last = session.i === session.items.length - 1;
   $("#hint").innerHTML = "";
+  $("#es-line").innerHTML = "";
   $("#feedback").innerHTML = `
     <div class="feedback ${ok ? "ok" : "ko"}">
       <strong>${ok ? `✓ ¡Correcto!${session.hinted ? " <span class='muted small'>(con pista: va a volver mañana)</span>" : ""}` : "✗ Incorrecto"}</strong>
@@ -771,6 +829,7 @@ document.addEventListener("click", (e) => {
   else if (t.dataset.read) location.hash = "regla/" + t.dataset.read;
   else if (t.id === "show-rule") { const r = $("#q-rule"); r.hidden = !r.hidden; }
   else if (t.id === "hint-btn") showHint();
+  else if (t.id === "es-btn") showTranslation();
   else if (t.id === "skip") answer(null);
   else if (t.dataset.opt !== undefined) answer(session.shuffled[+t.dataset.opt]);
   else if (t.dataset.part !== undefined) answer(+t.dataset.part);

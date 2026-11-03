@@ -21,7 +21,7 @@ progreso. Funciona sin instalar nada, sin cuenta y sin conexión a internet.
   En los ejercicios aparece después de responder, para no regalar la respuesta.
 - **Audio**: un botón 🔊 lee en inglés cada oración y cada verbo, con la voz del
   navegador (no necesita internet ni cuenta).
-- **Lista de verbos**: 101 irregulares y 72 regulares con pasado, participio,
+- **Lista de verbos**: 101 irregulares y 81 regulares con pasado, participio,
   significado, pronunciación aproximada escrita a la española y su conjugación
   en los tiempos que se practican.
 - **Pistas**: la primera letra de la respuesta, una opción tachada o la regla

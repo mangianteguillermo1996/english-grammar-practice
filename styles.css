@@ -282,3 +282,10 @@ p.es { margin: 2px 0 6px; }
   line-height: 1; vertical-align: baseline; border-radius: 6px; opacity: .75;
 }
 .say:hover, .say:focus-visible { opacity: 1; background: var(--accent-soft); }
+
+/* Ayuda en la pregunta: audio, pronunciación de opciones y significado del verbo */
+.option-row { display: flex; align-items: center; gap: 6px; }
+.option-row .option { flex: 1; }
+.option .sound { font-size: .8rem; }
+.gloss { margin: -6px 0 14px; font-size: .92rem; }
+.es-reveal { background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; margin: 12px 0 0; }
