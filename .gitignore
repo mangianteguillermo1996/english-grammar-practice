@@ -1,0 +1,15 @@
+# Editor / sistema
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Logs y temporales
+*.log
+temp/
+
+# Netlify CLI
+.netlify/
+
+# Respaldos de progreso exportados desde la app
+progreso-ingles-*.json
