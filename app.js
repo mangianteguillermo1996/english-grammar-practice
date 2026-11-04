@@ -693,14 +693,18 @@ function renderReadings() {
       <h2>Lectura</h2>
       <p class="muted small">Textos cortos para leer en voz alta. Debajo de cada palabra está cómo suena, escrito a la española. Leé primero con la ayuda, después ocultala y probá de nuevo${canSpeak ? ", y escuchá cada oración para comparar" : ""}.</p>
     </section>
-    <div class="topics">${READINGS.map((r) => `
-      <article class="topic">
-        <div class="topic-head"><h3>${esc(r.title)}</h3><span class="badge level-badge">${r.level}</span></div>
-        <p class="muted small">${esc(r.kind)} · ${r.lines.length} ${r.lines.length === 1 ? "línea" : "líneas"}</p>
-        <p class="small">${esc(r.intro)}</p>
-        <div class="topic-actions"><button class="btn primary small" data-reading="${r.id}">Leer</button></div>
-      </article>`).join("")}
-    </div>`;
+    ${READING_THEMES.map(([theme, name]) => `
+      <section class="level">
+        <h2>${esc(name)}</h2>
+        <div class="topics">${READINGS.filter((r) => (r.theme || "general") === theme).map((r) => `
+          <article class="topic">
+            <div class="topic-head"><h3>${esc(r.title)}</h3><span class="badge level-badge">${r.level}</span></div>
+            <p class="muted small">${esc(r.kind)} · ${r.lines.length} ${r.lines.length === 1 ? "línea" : "líneas"}</p>
+            <p class="small">${esc(r.intro)}</p>
+            <div class="topic-actions"><button class="btn primary small" data-reading="${r.id}">Leer</button></div>
+          </article>`).join("")}
+        </div>
+      </section>`).join("")}`;
 }
 
 // Cada palabra con su pronunciación debajo. Tocar una palabra la lee y, con la fonética oculta, la muestra.

@@ -24,7 +24,9 @@ progreso. Funciona sin instalar nada, sin cuenta y sin conexión a internet.
 - **Lista de verbos**: 101 irregulares y 81 regulares con pasado, participio,
   significado, pronunciación aproximada escrita a la española y su conjugación
   en los tiempos que se practican.
-- **Lectura en voz alta**: textos cortos (una presentación, un brindis, un
+- **Lectura en voz alta**: textos cortos de gestión de proyectos (reunión de
+  inicio, daily, informe de avance, avisar un atraso, cambio de alcance y
+  retrospectiva) y de situaciones generales (una presentación, un brindis, un
   relato, un discurso de bienvenida, frases célebres y el discurso de Gettysburg)
   con la pronunciación escrita a la española debajo de cada palabra. Se puede
   ocultar la fonética para probar solo, tocar una palabra para ver cómo suena,
