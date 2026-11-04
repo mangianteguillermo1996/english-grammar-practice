@@ -612,12 +612,16 @@ function sounds(v, i) {
 }
 
 const canSpeak = "speechSynthesis" in window;
-function speak(text) {
-  speechSynthesis.cancel();
+const SLOW_RATE = 0.6;
+function utterance(text, rate = 0.85) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
-  u.rate = 0.85;
-  speechSynthesis.speak(u);
+  u.rate = rate;
+  return u;
+}
+function speak(text, rate) {
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance(text, rate));
 }
 
 function renderVerbs() {
@@ -674,6 +678,116 @@ function toggleVerb(base) {
   verbsFilter.open = verbsFilter.open === base ? null : base;
   renderVerbList();
   document.querySelector(`tr[data-verb="${base}"]`)?.focus();
+}
+
+// ---------- Lectura en voz alta ----------
+
+let readingOpts = { pron: true, es: false, slow: false };
+const readingRate = () => (readingOpts.slow ? SLOW_RATE : undefined);
+
+function renderReadings() {
+  setNav("readings");
+  session = null;
+  view.innerHTML = `
+    <section class="card">
+      <h2>Lectura</h2>
+      <p class="muted small">Textos cortos para leer en voz alta. Debajo de cada palabra está cómo suena, escrito a la española. Leé primero con la ayuda, después ocultala y probá de nuevo${canSpeak ? ", y escuchá cada oración para comparar" : ""}.</p>
+    </section>
+    <div class="topics">${READINGS.map((r) => `
+      <article class="topic">
+        <div class="topic-head"><h3>${esc(r.title)}</h3><span class="badge level-badge">${r.level}</span></div>
+        <p class="muted small">${esc(r.kind)} · ${r.lines.length} ${r.lines.length === 1 ? "línea" : "líneas"}</p>
+        <p class="small">${esc(r.intro)}</p>
+        <div class="topic-actions"><button class="btn primary small" data-reading="${r.id}">Leer</button></div>
+      </article>`).join("")}
+    </div>`;
+}
+
+// Cada palabra con su pronunciación debajo. Tocar una palabra la lee y, con la fonética oculta, la muestra.
+function readingLine([en, pron, es, note], i) {
+  const prons = pron.split(" ");
+  const words = en.split(" ").map((w, j) => {
+    const bare = w.replace(/^[^\w']+|[^\w']+$/g, "");
+    return bare
+      ? `<button class="r-word" data-word="${esc(bare)}"><span class="r-en">${esc(w)}</span><span class="r-pr">${esc(prons[j])}</span></button>`
+      : `<span class="r-word"><span class="r-en">${esc(w)}</span><span class="r-pr"></span></span>`;
+  });
+  return `
+    <div class="r-line" data-line="${i}">
+      <div class="r-words">${words.join("")}${canSpeak ? `<button class="say" data-say="${esc(en)}" title="Escuchar" aria-label="Escuchar">🔊</button>` : ""}</div>
+      ${note ? `<p class="small muted r-note">— ${esc(note)}</p>` : ""}
+      <p class="es">${esc(es)}</p>
+    </div>`;
+}
+
+function renderReading(id) {
+  const r = READING_BY_ID[id];
+  if (!r) { location.replace("#lectura"); return; }
+  setNav("readings");
+  session = null;
+  const i = READINGS.indexOf(r), prev = READINGS[i - 1], nxt = READINGS[i + 1];
+  const opt = (key, label) => `<label class="check"><input type="checkbox" data-ropt="${key}" ${readingOpts[key] ? "checked" : ""}> ${label}</label>`;
+  view.innerHTML = `
+    <article class="card rule-page">
+      <button class="btn ghost small back" data-nav="readings">← Lecturas</button>
+      <p class="muted small">${esc(r.kind)} · ${r.level}</p>
+      <h1>${esc(r.title)}</h1>
+      <p class="muted">${esc(r.intro)}</p>
+      <div class="filters r-controls">
+        ${opt("pron", "Ver fonética")}
+        ${opt("es", "Ver traducción")}
+        ${canSpeak ? `${opt("slow", "Audio lento")}
+          <button class="btn small" id="read-all">▶ Escuchar todo</button>
+          <button class="btn small" id="read-stop">⏹ Parar</button>` : ""}
+      </div>
+      <details class="concept">
+        <summary>Cómo leer la fonética</summary>
+        <p>Es aproximada y está escrita como se leería en español. La tilde marca la sílaba fuerte. <b>z</b> es con la lengua entre los dientes (<i>think</i>), <b>d</b> en <i>the</i> o <i>that</i> es casi igual pero vibrando, <b>sh</b> como en «shampoo», <b>j</b> es una h suave, como un suspiro (<i>have</i>), y <b>y</b> es la y rioplatense, más suave en <i>job</i> o <i>just</i>.</p>
+        <p>Las palabras chicas como <i>to</i>, <i>and</i> o <i>can</i> casi siempre se dicen débiles y rápido: <b>te</b>, <b>an</b>, <b>ken</b>. <i>The</i> suena <b>de</b>, y <b>di</b> antes de vocal.</p>
+        <p>Con la fonética oculta, tocá una palabra para ver cómo suena${canSpeak ? " y escucharla" : ""}.</p>
+      </details>
+      <div id="reading" class="reading ${readingOpts.pron ? "" : "no-pron"} ${readingOpts.es ? "" : "no-es"}">
+        ${r.lines.map(readingLine).join("")}
+      </div>
+    </article>
+    <div class="rule-pager">
+      ${prev ? `<button class="btn" data-reading="${prev.id}">← ${esc(prev.title)}</button>` : "<span></span>"}
+      ${nxt ? `<button class="btn" data-reading="${nxt.id}">${esc(nxt.title)} →</button>` : ""}
+    </div>`;
+  window.scrollTo(0, 0);
+}
+
+function setReadingOpt(key, on) {
+  readingOpts[key] = on;
+  const box = $("#reading");
+  box.classList.toggle("no-pron", !readingOpts.pron);
+  box.classList.toggle("no-es", !readingOpts.es);
+  if (key === "pron") box.querySelectorAll(".peek").forEach((w) => w.classList.remove("peek"));
+}
+
+function tapWord(btn) {
+  if (!readingOpts.pron) btn.classList.toggle("peek");
+  if (canSpeak) speak(btn.dataset.word, readingRate());
+}
+
+// Lee el texto entero, una línea tras otra, marcando la que está sonando.
+function readAll() {
+  stopReading();
+  const lines = [...document.querySelectorAll(".r-line")];
+  const r = READING_BY_ID[location.hash.slice("#lectura/".length)];
+  lines.forEach((el, i) => {
+    const u = utterance(r.lines[i][0], readingRate());
+    u.onstart = () => {
+      lines.forEach((l) => l.classList.toggle("reading-now", l === el));
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    if (i === lines.length - 1) u.onend = () => el.classList.remove("reading-now");
+    speechSynthesis.speak(u);
+  });
+}
+function stopReading() {
+  speechSynthesis.cancel();
+  document.querySelectorAll(".reading-now").forEach((l) => l.classList.remove("reading-now"));
 }
 
 // ---------- Libreta de errores ----------
@@ -792,8 +906,8 @@ function renderProgress() {
 // ---------- Rutas ----------
 // Cada pantalla tiene su #ruta para que los botones atrás/adelante del navegador funcionen.
 
-const ROUTES = { home: "inicio", verbs: "verbos", mistakes: "errores", progress: "progreso" };
-const RENDER = { inicio: renderHome, verbos: renderVerbs, errores: renderMistakes, progreso: renderProgress };
+const ROUTES = { home: "inicio", verbs: "verbos", readings: "lectura", mistakes: "errores", progress: "progreso" };
+const RENDER = { inicio: renderHome, verbos: renderVerbs, lectura: renderReadings, errores: renderMistakes, progreso: renderProgress };
 
 function go(name) {
   const hash = "#" + ROUTES[name];
@@ -803,12 +917,16 @@ function go(name) {
 
 function route() {
   const r = location.hash.slice(1);
+  // Al cambiar de pantalla se corta el audio (por ejemplo, un texto que se estaba leyendo entero).
+  if (canSpeak) speechSynthesis.cancel();
   if (r === "practica") {
     // Sin sesión activa (por ejemplo, al volver con "adelante") no hay nada que mostrar.
     if (session) renderQuestion();
     else location.replace("#inicio");
   } else if (r.startsWith("regla/")) {
     renderRulePage(r.slice("regla/".length));
+  } else if (r.startsWith("lectura/")) {
+    renderReading(r.slice("lectura/".length));
   } else {
     (RENDER[r] || renderHome)();
   }
@@ -822,7 +940,11 @@ document.addEventListener("click", (e) => {
   const t = e.target.closest("button, label, tr[data-verb]");
   if (!t) return;
   if (t.dataset.nav) go(t.dataset.nav);
-  else if (t.dataset.say) speak(t.dataset.say);
+  else if (t.dataset.say) speak(t.dataset.say, t.closest("#reading") ? readingRate() : undefined);
+  else if (t.dataset.word) tapWord(t);
+  else if (t.dataset.reading) location.hash = "lectura/" + t.dataset.reading;
+  else if (t.id === "read-all") readAll();
+  else if (t.id === "read-stop") stopReading();
   else if (t.dataset.verb) toggleVerb(t.dataset.verb);
   else if (t.dataset.verbsKind) { verbsFilter.kind = t.dataset.verbsKind; renderVerbs(); }
   else if (t.dataset.start) startSession(t.dataset.start, t.dataset.topic);
@@ -848,6 +970,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("change", (e) => {
   if (e.target.id === "mistakes-topic") { mistakesFilter.topic = e.target.value; renderMistakes(); return; }
   if (e.target.id === "mistakes-overcome") { mistakesFilter.showOvercome = e.target.checked; renderMistakes(); return; }
+  if (e.target.dataset.ropt) { setReadingOpt(e.target.dataset.ropt, e.target.checked); return; }
   if (e.target.id !== "import" || !e.target.files[0]) return;
   importProgress(e.target.files[0])
     .then(() => { alert("Progreso importado."); renderProgress(); })

@@ -24,6 +24,12 @@ progreso. Funciona sin instalar nada, sin cuenta y sin conexión a internet.
 - **Lista de verbos**: 101 irregulares y 81 regulares con pasado, participio,
   significado, pronunciación aproximada escrita a la española y su conjugación
   en los tiempos que se practican.
+- **Lectura en voz alta**: textos cortos (una presentación, un brindis, un
+  relato, un discurso de bienvenida, frases célebres y el discurso de Gettysburg)
+  con la pronunciación escrita a la española debajo de cada palabra. Se puede
+  ocultar la fonética para probar solo, tocar una palabra para ver cómo suena,
+  escuchar cada oración o el texto entero (también en modo lento) y ver la
+  traducción.
 - **Pistas**: la primera letra de la respuesta, una opción tachada o la regla
   del tema. Un acierto con pista vuelve a aparecer al día siguiente.
 - **Repetición espaciada**: lo que fallás vuelve pronto, y lo que acertás vuelve
