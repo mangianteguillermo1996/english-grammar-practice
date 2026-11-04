@@ -14,11 +14,14 @@ con doble clic en `index.html` (`file://`) y se puede publicar tal cual en Netli
 - `data/verbs.js`: verbos regulares e irregulares con sus formas, significado y
   pronunciación aproximada.
 - `data/es.js`: traducciones al español (ver más abajo).
+- `data/readings.js`: textos para leer en voz alta, con la pronunciación de cada
+  palabra y la traducción de cada línea.
 - `generators.js`: plantillas que generan ejercicios nuevos para cada tema.
 - `progress.js`: progreso en `localStorage`, repetición espaciada, estadísticas,
   test de nivel y exportación/importación.
 - `app.js`: corrección, armado de sesiones, vistas y rutas por hash (`#inicio`,
-  `#errores`, `#progreso`, `#practica`, `#verbos`, `#regla/<tema>`).
+  `#errores`, `#progreso`, `#practica`, `#verbos`, `#regla/<tema>`, `#lectura`,
+  `#lectura/<texto>`).
 
 Los datos van en `.js`, no en `.json`, porque desde `file://` el navegador no
 permite `fetch`. Los scripts se cargan en orden en `index.html`.
@@ -55,6 +58,13 @@ En `err`, la oración corregida completa (con `<b>` en lo que cambia) es opciona
 falta cuando reemplazar la parte marcada por la corrección no arma una oración
 correcta (por ejemplo, si la corrección tiene alternativas con `/` o cambia más de
 una parte).
+
+## Lecturas
+
+Cada línea de `data/readings.js` es `[inglés, pronunciación, traducción, nota?]`. La
+pronunciación lleva una palabra por cada palabra del inglés separada por espacios
+(sin puntuación; un `—` suelto va igual en los dos), con la misma notación a la
+española que `VERB_PRON`. El chequeo tiene que confirmar que las cantidades coinciden.
 
 ## Traducciones
 
